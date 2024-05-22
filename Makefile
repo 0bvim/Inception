@@ -35,3 +35,5 @@ pre_build:
 		sudo mkdir -p ${MARIADB_DIR}; \
 	fi
 
+DOCKER_COMP_FILE=srcs/docker-compose.yml
+DOCKER_COMP_CMD=docker compose -f ${DOCKER_COMP_FILE}
