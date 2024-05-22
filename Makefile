@@ -16,7 +16,22 @@ pre_build:
 	@echo "\n${RED}Starting configuration and building dependencies${NO_COLOR}"
 	@echo "\n${BLUE}Injecting .env file in srcs directory."
 
+	# downloading .env information.
 	if [ ! -f ./srcs/.env ]; then \
 		wget -O srcs/.env https://raw.githubusercontent.com/0bvim/Inception/main/srcs/.env; \
+	fi
+
+	# inserting login extension to local hosts as required.
+	if ! grep -q '${LOGIN}' /etc/hosts; then \
+		echo "127.0.0.1 ${LOGIN}.42.fr" | sudo tee -a /etc/hosts > /dev/null; \
+	fi
+
+	# adding directories to user
+	if [ ! -d "${WORDPRESS_DIR}" ]; then \
+		sudo mkdir -p ${WORDPRESS_DIR}; \
+	fi
+
+	if [ ! -d "${MARIADB_DIR}" ]; then \
+		sudo mkdir -p ${MARIADB_DIR}; \
 	fi
 
