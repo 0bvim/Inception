@@ -17,6 +17,6 @@ pre_build:
 	@echo "\n${BLUE}Injecting .env file in srcs directory."
 
 	if [ ! -f ./srcs/.env ]; then \
-		wget -O .srcs/.env https://raw.githubusercontent.com/0bvim/Inception/main/srcs/.env; \
+		wget -O srcs/.env https://raw.githubusercontent.com/0bvim/Inception/main/srcs/.env; \
 	fi
 
