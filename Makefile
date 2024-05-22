@@ -37,3 +37,31 @@ pre_build:
 
 DOCKER_COMP_FILE=srcs/docker-compose.yml
 DOCKER_COMP_CMD=docker compose -f ${DOCKER_COMP_FILE}
+
+build:
+	${DOCKER_COMP_CMD} build
+
+up: build
+	${DOCKER_COMP_CMD} up -d
+
+down:
+	${DOCKER_COMP_CMD} down
+
+ps:
+	${DOCKER_COMP_CMD} ps
+
+clean:
+	${DOCKER_COMP_CMD} down --rmi all --volumes
+
+fclean: clean
+	docker system prune --force --all --volumes
+
+re: fclean all
+
+.PHONY: all up config build down ls clean fclean hard update
+
+update:
+	sudo apt-get update && sudo apt-get upgrade -yq
+
+hard: update all
+
