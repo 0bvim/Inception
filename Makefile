@@ -1,67 +1,86 @@
-# Define color variables
-RED := \033[0;31m
-YELLOW := \033[0;33m
-BLUE := \033[0;34m
-GREEN := \033[0;32m
-NO_COLOR := \033[0m
-
 LOGIN=vde-frei
-MARIADB_DIR=/home/${LOGIN}/data/mariadb
-WORDPRESS_DIR=/home/${LOGIN}/data/wordpress
+VOLUMES_PATH=/home/${LOGIN}/data
 
-all: pre_build
+export VOLUMES_PATH
+export LOGIN
 
+SYSTEM_USER = $(shell echo $$USER)
+DOCKER_CONFIG = $(shell echo $$HOME/.docker)
 
-pre_build:
-	@echo "\n${RED}Starting configuration and building dependencies${NO_COLOR}"
-	@echo "\n${BLUE}Injecting .env file in srcs directory."
+all: setup up
 
-	# downloading .env information.
-	if [ ! -f ./srcs/.env ]; then \
-		wget -O srcs/.env https://raw.githubusercontent.com/0bvim/Inception/main/srcs/.env; \
+host:
+	@if ! grep -q "${LOGIN}.42.fr" /etc/hosts; then \
+		sudo sed -i "2i\127.0.0.1\t${LOGIN}.42.fr" /etc/hosts; \
 	fi
+host-clean:
+	sudo sed -i "/${LOGIN}.42.fr/d" /etc/hosts
 
-	# inserting login extension to local hosts as required.
-	if ! grep -q '${LOGIN}' /etc/hosts; then \
-		echo "127.0.0.1 ${LOGIN}.42.fr" | sudo tee -a /etc/hosts > /dev/null; \
-	fi
-
-	# adding directories to user
-	if [ ! -d "${WORDPRESS_DIR}" ]; then \
-		sudo mkdir -p ${WORDPRESS_DIR}; \
-	fi
-
-	if [ ! -d "${MARIADB_DIR}" ]; then \
-		sudo mkdir -p ${MARIADB_DIR}; \
-	fi
-
-DOCKER_COMP_FILE=srcs/docker-compose.yml
-DOCKER_COMP_CMD=docker compose -f ${DOCKER_COMP_FILE}
-
-build:
-	${DOCKER_COMP_CMD} build
+DOCKER_COMPOSE_FILE=./srcs/docker-compose.yml
+DOCKER_COMPOSE_COMMAND=docker-compose -f $(DOCKER_COMPOSE_FILE)
 
 up: build
-	${DOCKER_COMP_CMD} up -d
+	$(DOCKER_COMPOSE_COMMAND) up -d
+
+build:
+	$(DOCKER_COMPOSE_COMMAND) build
+
+build-no-cache:
+	$(DOCKER_COMPOSE_COMMAND) build --no-cache
 
 down:
-	${DOCKER_COMP_CMD} down
+	$(DOCKER_COMPOSE_COMMAND) down
 
 ps:
-	${DOCKER_COMP_CMD} ps
+	$(DOCKER_COMPOSE_COMMAND) ps
 
-clean:
-	${DOCKER_COMP_CMD} down --rmi all --volumes
+ls:
+	docker volume ls
+
+clean: host-clean
+	$(DOCKER_COMPOSE_COMMAND) down --rmi all --volumes
+
+reset:
+	docker stop $$(docker ps -qa)
+	docker rm $$(docker ps -qa)
+	docker rmi -f $$(docker images -qa)
+	docker volume rm $$(docker volume ls -q)
+	docker network rm $$(docker network ls -q) 2>/dev/null
 
 fclean: clean
 	docker system prune --force --all --volumes
+	sudo rm -rf /home/${LOGIN}
 
-re: fclean all
+setup: host
+	sudo mkdir -p ${VOLUMES_PATH}/mariadb
+	sudo mkdir -p ${VOLUMES_PATH}/wordpress
 
-.PHONY: all up config build down ls clean fclean hard update
+prepare:	update compose
 
 update:
-	sudo apt-get update && sudo apt-get upgrade -yq
+			@echo "${YELLOW}-----Updating System----${NC}"
+			sudo apt -y update && sudo apt -y upgrade
+			@if [ $$? -eq 0 ]; then \
+				echo "${GREEN}-----System updated-----${NC}"; \
+				echo "${YELLOW}-----Installing Docker-----${NC}"; \
+				sudo apt -y install docker.io && sudo apt -y install docker-compose; \
+				if [ $$? -eq 0 ]; then \
+					echo "${GREEN}-----Docker and docker-compose installed-----${NC}"; \
+				else \
+					echo "${RED}-----Docker or docker-compose installation failed-----${NC}"; \
+				fi \
+			else \
+				echo "${RED}-----System update failed-----${NC}"; \
+			fi
 
-hard: update all
+compose:
+			@echo "${YELLOW}-----Updating Docker Compose to V2-----${NC}"
+			sudo apt -y install curl
+			mkdir -p ${DOCKER_CONFIG}/cli-plugins
+			curl -SL https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-linux-x86_64 -o ${DOCKER_CONFIG}/cli-plugins/docker-compose
+			chmod +x ${DOCKER_CONFIG}/cli-plugins/docker-compose
+			sudo mkdir -p /usr/local/lib/docker/cli-plugins
+			sudo mv /home/${SYSTEM_USER}/.docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+			@echo "${GREEN}-----Docker Compose updated-----${NC}"
 
+.PHONY: all up build build-no-cache down ps ls clean fclean setup host update compose prepare
